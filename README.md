@@ -1,7 +1,7 @@
-<Gene-family pangenome analysis of Arabis alpina>
-# pangenome_analysis
+# MASTER THESIS
+# Assembly workflow
 
-## Construction of Pangenome
+# Construction of a Gene-family Pangenome
 
 ### via MAP-TO-PAN strategy
 
