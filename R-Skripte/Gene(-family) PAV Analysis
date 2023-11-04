@@ -1,0 +1,123 @@
+####PAV####
+
+gene_presence_absence_matrix <- read.delim("~/Studium/Köln_Biological Science/Master Thesis/Results/presence_absence_matrix.tsv")
+View(presence_absence_matrix)
+install.packages("pheatmap")
+library(pheatmap)
+
+# Create a heatmap
+pheatmap(
+  gene_presence_absence_matrix,
+  color = c("white", "blue"),   # Color scheme (adjust as needed)
+  cluster_rows = TRUE,          # Cluster rows (genes)
+  cluster_cols = TRUE,          # Cluster columns (samples)
+  fontsize_row = 8,             # Font size for row labels
+  fontsize_col = 8,             # Font size for column labels
+  border_color = "gray",        # Color of cell borders
+  annotation_col = NULL,        # Add sample annotations if needed
+  annotation_colors = NULL,     # Customize annotation colors
+  annotation_legend = TRUE,     # Show annotation legend
+  main = "Presence-Absence Heatmap",  # Title of the heatmap
+  filename = "heatmap.png"      # File name for saving the heatmap (optional)
+)
+
+
+library(vegan)
+heatmap(gene_presence_absence_matrix)
+str(gene_presence_absence_matrix)
+as.matrix(gene_presence_absence_matrix)
+m <- as.matrix(gene_presence_absence_matrix[, -1])
+rownames(m) <- gene_presence_absence_matrix$Gene
+
+#HEATMAP########
+specaccum()
+heatmap(m)
+
+
+library(reshape)                                                # Load reshape package
+
+data_melt <- melt(data)                                           # Reorder data
+library(ggplot2)                                                # Load ggplot2 package
+
+ggp <- ggplot(data_melt, aes(X1, X2)) +                           # Create heatmap with ggplot2
+  geom_tile(aes(fill = value))
+ggp       
+
+version
+
+
+
+#######################################
+sum(gene_presence_absence_matrix$ES04_014)
+row.names(m)
+names(tran_genes)
+transposed_gene_presence <- t(m)
+colnames(transposed_gene_presence)
+transposed_gene_presence$AA4T21160.1
+transposed_gene_presence <- as.data.frame(transposed_gene_presence)
+
+ncol(transposed_gene_presence)
+sum(transposed_gene_presence$AA8T40270.1)
+names(transposed_gene_presence)
+gene_count <- numeric(length(names(transposed_gene_presence)))  # Initialize a numeric vector
+
+i <- 1
+for (gene in names(transposed_gene_presence)) {
+  gene_count[i] <- sum(transposed_gene_presence[, gene])  # Use [, ] to access the column by variable value
+  i <- i + 1
+}
+
+
+gene_presence_absence_matrix$frequency <- gene_count
+
+# Define breaks and labels
+breaks <- c(0, 1, 14, 20, 21)
+labels <- c("1", "2-14", "14-20", "21")
+
+# Create frequency table
+freq_table <- table(
+  Category = cut(gene_count, breaks = breaks, labels = labels, include.lowest = TRUE)
+)
+
+# Create Venn diagram
+venn.plot <- venn.diagram(
+  x = list(
+    "1" = which(freq_table == "1"),
+    "2-14" = which(freq_table == "2-14"),
+    "14-20" = which(freq_table == "14-20"),
+    "21+" = which(freq_table == "21")
+  ),
+  category.names = c("1", "2-14", "14-20", "21"),
+  filename = NULL,
+  output = TRUE
+)
+
+# Plot the Venn diagram
+grid.draw(venn.plot)
+
+##############PCA##################
+library(vegan)
+df.pca <- rda(m, scale=TRUE)
+summary(df.pca)
+(inventory <- df.pca$CA$eig)
+screeplot(df.pca, bstick = TRUE, npcs=length(df.pca$CA$eig))
+biplot_PAV <- biplot(df.pca, scaling = 1, type="text", xlab="PC1", ylab="PC2")
+
+
+biplot(df.pca, scaling = 2, type="text", xlab="PC1", ylab="PC2")
+
+
+?biplot
+biplot(df.pca, scaling = 1, type="text", xlab="PC1", ylab="PC2")
+
+
+
+#here gen is the dataframe with the dataset
+pcaresults <- prcomp(m, scale = TRUE)
+summary(pcaresults)
+#followed up for the visualisation of 
+install.packages("FactoMineR"), factoextra, ggplot2
+fviz_pca_ind(pcaresults) #you can use ggplots attributes to make the plot look better
+?fviz_pca_ind
+library(FactoMineR)
+fviz_pca_ind(pcaresults)
