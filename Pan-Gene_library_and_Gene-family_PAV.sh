@@ -87,81 +87,36 @@ done < "$input_file"
 
 
 
-export PATH=/netscratch/dep_coupland/grp_fulgione/male/assemblies/EUPAN-v0.44/bin:$PATH
-
-export LD_LIBRARY_PATH=/netscratch/dep_coupland/grp_fulgione/male/assemblies/EUPAN-v0.44/lib/:$LD_LIBRARY_PATH
-export PERL5LIB=/netscratch/dep_coupland/grp_fulgione/male/assemblies/EUPAN-v0.44/lib/:$PERL5LIB
-source /netscratch/dep_coupland/grp_fulgione/male/assemblies/EUPAN-v0.44/bin/eupan_cmd.sh
 
 
+#Map sequences against reference create paf
+bsub -q multicore20 -R "rusage[mem=35000]" -M 45000 "minimap2 -t 20 -cx asm5 /netscratch/dep_coupland/grp_fulgione/male/assemblies/Reference_v5.1_analysis/Reference_v5.1_updated.fasta unaligned_contigs_renamed.fasta > conts_against_ref.paf "
 
-export PATH=$PATH:/netscratch/dep_coupland/grp_fulgione/male/assemblies/HUPAN-v1.04/bin:
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/netscratch/dep_coupland/grp_fulgione/male/assemblies/HUPAN-v1.04/lib/:
-export PERL5LIB=$PERL5LIB:/netscratch/dep_coupland/grp_fulgione/male/assemblies/HUPAN-v1.04/lib/:
-source /netscratch/dep_coupland/grp_fulgione/male/assemblies/HUPAN-v1.04/hupan_cmd.sh
+#remove all sequences from NRR set which coverage <0.6
+python paf_drop_coverage.py drop conts_against_ref.paf 0.6 > contigs_to_remove.list
+python faSomeRecords.py --fasta unaln_conts.fasta --list contigs_to_remove.list --outfile contigs_dont_match.fasta --exclude
 
+export PATH=/netscratch/dep_coupland/grp_fulgione/male/assemblies/pangenome/unaln_contigs/gclust/:$PATH
+/gclust/script/sortgenome.pl --genomes-file contigs_dont_match.fasta \
+	--sortedgenomes-file contigs_dont_match.sorted.fasta
 
-hupanSLURM alignContig -s merged_out.fasta /netscratch/dep_coupland/grp_fulgione/male/assemblies/pangenome/data_contigs /netscratch/dep_coupland/grp_fulgione/male/assemblies/pangenome/unaligned_contigs /opt/share/software/bin/mummer /netscratch/dep_coupland/grp_fulgione/male/assemblies/Reference_v5.1_analysis/Reference_v5.1_updated.fasta
+gclust -loadall \
+	-minlen 20 \
+	-both \
+	-nuc \
+	-threads 40 \
+	-ext 1 \
+	-sparse 2 \
+	-memiden 90 \
+	contigs_dont_match.sorted.fasta > contigs_dont_match.sorted.gclust.clu
 
-#Split sets
-import random
-
-def split_fasta(input_file, output_prefix, num_datasets):
-    # Read the input FASTA file into a dictionary
-    sequences = {}
-    current_sequence = ''
-    with open(input_file, 'r') as f:
-        for line in f:
-            if line.startswith('>'):
-                current_sequence = line.strip()
-                sequences[current_sequence] = ''
-            else:
-                sequences[current_sequence] += line.strip()
-
-    # Shuffle the sequences randomly
-    sequence_keys = list(sequences.keys())
-    random.shuffle(sequence_keys)
-
-    # Split the sequences into smaller datasets
-    chunk_size = len(sequence_keys) // num_datasets
-    for i in range(num_datasets):
-        dataset_name = '{}_{}.fasta'.format(output_prefix, i)
-        with open(dataset_name, 'w') as f:
-            for key in sequence_keys[i * chunk_size:(i + 1) * chunk_size]:
-                f.write(key + '\n')
-                f.write(sequences[key] + '\n')
-
-if __name__ == '__main__':
-    input_file = 'input.fasta'  # Replace with your input FASTA file
-    output_prefix = 'dataset'  # Prefix for output dataset filenames
-    num_datasets = 5  # Number of smaller datasets to create
-
-    split_fasta(input_file, output_prefix, num_datasets)
+python clu2fa.py contigs_dont_match.sorted.fasta contigs_dont_match.sorted.gclust.clu contigs_dont_match.gclust.fasta
+scp marimond@dell-node-12.mpipz.mpg.de:/netscratch/dep_coupland/grp_fulgione/male/assemblies/pangenome/unaln_contigs/contigs_dont_match.gclust.fasta
 
 
-##CDHIT remove redundancies
-#Map sequences against reference
-
-#!/bin/bash
-
-
-input="/netscratch/dep_coupland/grp_fulgione/male/assemblies/SC_assemblies.txt"
-output="/netscratch/dep_coupland/grp_fulgione/male/assemblies/pangenome/unaln_contigs/unaln_conts.fasta"
-
-
-while read -r col1 col2 _; do
-grep -A 1 -f /netscratch/dep_coupland/grp_fulgione/male/assemblies/pangenome/unaln_contigs/contigs_per_sample/${col1}_unaln.contig.txt /netscratch/dep_coupland/grp_fulgione/male/assemblies/${col1}/merged_flye_hifiasm/merged_out.fasta | grep -v '^--$' | sed s/contig/contig_${col1}/ >> $output
-
-done < $input
 
 
 bsub -q multicore20 -R "rusage[mem=35000]" -M 45000 "minimap2 -t 20 -ax asm5 ../../Reference_v5.1_analysis/Reference_v5.1_updated.fasta unaln_conts.fasta  --secondary=no \ | samtools sort -m 1G -o unaln_conts_sort.sam"
-bsub -q multicore20 -R "rusage[mem=35000]" -M 45000 "blastn -db /opt/share/blastdb/ncbi/nt -query contigs_dont_match.gclust.fasta -outfmt 6 -out blast_hits_nt -num-threads 20"
-
-python3 getTax.py blastnt/unalign_clsutered.blastnt 2 ~/data/db/taxonomy_20200715/nucl_gb.accession2taxid ~/data/db/taxonomy_20200715/rankedlineage.dmp > blastnt/unalign_clsutered.tax
-python3 filter_exclude_contig.py blastnt/unalign_clsutered.blastnt blastnt/uunalign_clsutered.tax 0 0 0 > blastnt/unalign_clsutered.polution
-~/tool/faSomeRecords ${query} -exclude blastnt/unalign_clsutered.polution blastnt/unalign_clsutered_clean.fa
-https://github.com/SJTU-CGM/TGSRICEPAN/blob/master/Genomes2Pan.sh
 
 #!/bin/bash
 export BLASTDB="/opt/share/blastdb/ncbi"
@@ -187,43 +142,8 @@ echo "in total:"
 wc -l all_contigs_contaminated_unique.txt
 echo "contaminated conigs"
 
-#REMOVE Myzus_contaminations
-bash /netscratch/dep_coupland/grp_fulgione/male/assemblies/Skripte/pangenome/remove_contaminations.sh
-##ANALYSIS
-# set path to local BLAST databases
-export BLASTDB="/opt/share/blastdb/ncbi"
-blobtools create -i ../contigs_dont_match.gclust.masked.fasta -t blast_hits_unaln_conts.txt --nodes /opt/share/blastdb/taxonomy/nodes.dmp --names /opt/share/blastdb/taxonomy/names.dmp -o unaligned_contigs_TaxIDs
-
-bsub -q bigmem -R "rusage[mem=400000]" -M 430000 "bash /netscratch/dep_coupland/grp_fulgione/male/assemblies/Skripte/analysis_final_assemblies/blobtools.sh"
-
-#Filter out unmapped sequences
-samtools view -F 4 -b ref_cont_sort.sam > mapped_reads.bam
-samtools bam2fq -c 0 unmapped_reads.bam > unmapped_reads.fq
 
 
-
-
-python paf_drop_coverage.py drop conts_against_ref.paf 0.6 > contigs_to_remove.list
-
-python faSomeRecords.py --fasta unaln_conts.fasta --list contigs_to_remove.list --outfile contigs_dont_match.fasta --exclude
-
-export PATH=/netscratch/dep_coupland/grp_fulgione/male/assemblies/pangenome/unaln_contigs/gclust/:$PATH
-/gclust/script/sortgenome.pl --genomes-file contigs_dont_match.fasta \
-	--sortedgenomes-file contigs_dont_match.sorted.fasta
-
-gclust -loadall \
-	-minlen 20 \
-	-both \
-	-nuc \
-	-threads 40 \
-	-ext 1 \
-	-sparse 2 \
-	-memiden 90 \
-	contigs_dont_match.sorted.fasta > contigs_dont_match.sorted.gclust.clu
-
-python clu2fa.py contigs_dont_match.sorted.fasta contigs_dont_match.sorted.gclust.clu contigs_dont_match.gclust.fasta
-scp marimond@dell-node-12.mpipz.mpg.de:/netscratch/dep_coupland/grp_fulgione/male/assemblies/pangenome/unaln_contigs/contigs_dont_match.gclust.fasta
-bsub -q multicore20 -R "rusage[mem=35000]" -M 45000 "minimap2 -t 20 -cx asm5 /netscratch/dep_coupland/grp_fulgione/male/assemblies/Reference_v5.1_analysis/Reference_v5.1_updated.fasta ES18_040_final_assembly.fasta > ES18_040_all_chr_against_ref_ragtag_nucmer.paf"
 
 https://www.plabipd.de/helixer_main.html
 
